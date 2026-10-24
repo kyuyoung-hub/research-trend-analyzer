@@ -5,9 +5,7 @@
 
 ## 설명 영상 (23초)
 
-<video src="media/analyzer-demo.mp4" poster="media/analyzer-demo-poster.png" controls muted playsinline width="720">
-  이 화면에서 영상이 재생되지 않으면 아래 링크로 여세요.
-</video>
+https://github.com/kyuyoung-hub/research-trend-analyzer/raw/feature-analyzer-dashboard/media/analyzer-demo.mp4
 
 [![설명 영상 미리보기](media/analyzer-demo-poster.png)](media/analyzer-demo.mp4)
 
