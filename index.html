@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>환자경험평가 연구 동향 분석기</title>
+<style>
+  :root { --navy: #0f2347; --line: #e3e7ef; --muted: #6b7280; --blue: #2563eb; }
+  body { margin: 0; padding: 18px; background: #eef1f7; font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; color: #1f2937; }
+  .app { max-width: 1180px; margin: 0 auto; background: #f7f8fc; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  header { background: var(--navy); color: #fff; padding: 16px 22px; }
+  header h1 { margin: 0; font-size: 19px; display: inline; }
+  header span { margin-left: 12px; font-size: 13px; opacity: .8; }
+  .body { padding: 16px 18px 20px; display: grid; grid-template-columns: 330px 1fr; gap: 16px; align-items: start; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card h2 small { font-weight: normal; color: var(--muted); font-size: 12px; }
+
+  /* 왼쪽: 입력 카드 */
+  .input-card h2 { margin-bottom: 4px; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  .hint code { background: #eef0f4; border-radius: 4px; padding: 1px 5px; }
+  #paste { width: 100%; box-sizing: border-box; height: 190px; padding: 8px; border: 1px solid #d1d5db; border-radius: 8px; font: 12px/1.5 ui-monospace, Consolas, monospace; resize: vertical; white-space: pre; }
+  .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .btn { padding: 8px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.red { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .opt { margin-top: 10px; font-size: 13px; color: #4b5563; }
+  .opt input { width: 74px; padding: 5px 7px; border: 1px solid #d1d5db; border-radius: 6px; }
+  #status { margin-top: 10px; padding: 9px 11px; background: #eaf2ff; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+  #status.error { background: #fee2e2; color: #991b1b; }
+
+  /* 오른쪽 */
+  .right { display: grid; gap: 14px; min-width: 0; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; display: flex; gap: 6px; align-items: baseline; }
+  .chip-label { font-size: 13px; color: #4b5563; }
+  .chip-value { font-size: 18px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+  .bottom { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+  .bottom > .card:first-child { grid-column: span 2; }
+  @media (max-width: 1000px) { .bottom > .card:first-child { grid-column: auto; } }
+  select { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; max-width: 150px; }
+
+  .bar-label, .axis { font-size: 12px; fill: #374151; }
+  .bar-value, .point-value { font-size: 11px; fill: #374151; }
+  .bar-row:hover rect { opacity: .8; }
+  .grid { stroke: #e5e7eb; }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: #4b5563; margin-top: 4px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .list-head { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 160px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .list-count, .held-count { font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  .table-wrap { overflow: auto; max-height: 440px; }
+  .trend-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .trend-table th, .trend-table td { padding: 6px 8px; border-bottom: 1px solid #eef0f4; text-align: left; white-space: nowrap; }
+  .trend-table th { background: #f8fafc; color: #4b5563; font-weight: 600; position: sticky; top: 0; }
+  .num { text-align: right !important; font-variant-numeric: tabular-nums; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #eef0f4; }
+  .trend-상승 { background: #dbeafe; color: #1d4ed8; }
+  .trend-신규 { background: #dcfce7; color: #15803d; }
+  .trend-하락 { background: #fee2e2; color: #b91c1c; }
+  .held-list { list-style: none; padding: 0; margin: 0; max-height: 400px; overflow-y: auto; }
+  .held-list li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #eef0f4; font-size: 13px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .welcome { color: var(--muted); font-size: 14px; line-height: 1.7; }
+  @media (max-width: 900px) { .body { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>환자경험평가 연구 동향 분석기</h1><span>연구 목록을 넣으면 키워드를 뽑아 연도별 추세(상승·신규·하락)로 정리합니다</span></header>
+
+  <div class="body">
+    <section class="card input-card">
+      <h2>연구 목록 넣기</h2>
+      <p class="hint">CSV 첫 줄은 <code>year,title,keywords,source</code> · 붙여넣거나 파일을 고르세요</p>
+      <textarea id="paste" spellcheck="false" placeholder="year,title,keywords,source&#10;2024,Patient-Reported Experience Measures in Adult Inpatient Settings,PREM;측정도구,논문"></textarea>
+      <div class="buttons">
+        <button class="btn primary" id="load-sample">예시 불러오기</button>
+        <button class="btn" id="load-pubmed">PubMed 논문 불러오기</button>
+        <label class="btn" for="file">파일 선택</label><input id="file" type="file" accept=".csv,text/csv" hidden>
+        <button class="btn" id="run">분석하기</button>
+      </div>
+      <p class="opt"><label>연도 상한 <input id="max-year" type="number" min="1900" max="2100" placeholder="전체"></label> <span class="hint">진행 중인 해를 빼려면 입력</span></p>
+      <div id="status">예시를 불러오거나 CSV를 붙여넣은 뒤 분석하기를 누르세요. 판단 기준은 <code>js/rules.js</code>에 있습니다.</div>
+    </section>
+
+    <div class="right" id="right">
+      <section class="card welcome" id="welcome">
+        <strong>아직 분석한 자료가 없습니다.</strong><br>
+        왼쪽에서 <b>예시 불러오기</b>를 누르면 팀이 모은 18편 목록으로, <b>PubMed 논문 불러오기</b>를 누르면 PubMed에서 내려받은 환자경험 논문(제목 기준 검색)으로 분석합니다.
+      </section>
+      <div id="result" hidden>
+        <div class="right">
+          <section class="chips" id="summary"></section>
+          <section class="chips" id="trend-chips"></section>
+          <div class="two">
+            <section class="card"><h2>상위 키워드 <small>막대를 누르면 추이에 함께 표시</small></h2><div id="top-bar"></div></section>
+            <section class="card"><h2>연도별 추이 <select id="kw-select" aria-label="키워드 선택"></select></h2><div id="trend"></div></section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom" id="bottom" hidden>
+      <section class="card"><h2>키워드 추세 목록 <small id="list-note"></small></h2><div id="trend-list"></div></section>
+      <section class="card"><h2>판정 보류 <small>건수가 적어 판정하지 않은 키워드 · rules.js 보강 후보</small></h2><div id="held"></div></section>
+    </div>
+  </div>
+</div>
+
+<script src="js/rules.js"></script>
+<script src="js/import.js"></script>
+<script src="js/keywords.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/list.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('ko-KR');
+  const maxYear = () => Number($('max-year').value) || null;
+
+  function status(msg, isError) { $('status').textContent = msg; $('status').className = isError ? 'error' : ''; }
+
+  function chip(label, value) {
+    const c = document.createElement('div'); c.className = 'chip';
+    const l = document.createElement('span'); l.className = 'chip-label'; l.textContent = label;
+    const v = document.createElement('strong'); v.className = 'chip-value'; v.textContent = fmt(value);
+    c.append(l, v); return c;
+  }
+
+  function run(text, label) {
+    const parsed = Importer.readRecords(text);
+    if (parsed.error) { status(parsed.error, true); return; }
+    let records = parsed.records, dropped = 0;
+    const my = maxYear();
+    if (my) { const n = records.length; records = records.filter(r => r.year <= my); dropped = n - records.length; }
+    if (!records.length) { status('분석할 줄이 없습니다. year · title 열과 연도(4자리 숫자)를 확인하세요.', true); return; }
+
+    const { results, summary } = Keywords.analyze(records, RULES);
+    summary.skipped = parsed.skipped;
+
+    const msg = [`${label}: ${fmt(records.length)}건을 읽었습니다.`];
+    msg.push(parsed.skipped.length ? `건너뛴 줄 ${parsed.skipped.length}개(줄 번호: ${parsed.skipped.slice(0, 8).join(', ')}${parsed.skipped.length > 8 ? ' …' : ''})` : '건너뛴 줄 없음.');
+    if (dropped) msg.push(`${my}년 이후 ${dropped}건은 제외했습니다.`);
+    msg.push(`판정: 최근 3년(${summary.lastYear - 2}~${summary.lastYear}) vs 이전 3년(${summary.lastYear - 5}~${summary.lastYear - 3}).`);
+    status(msg.join(' '));
+
+    $('welcome').hidden = true; $('result').hidden = false; $('bottom').hidden = false;
+
+    const years = Charts.yearsOf(results, summary);
+    const total = { label: '전체 건수', counts: summary.byYear };
+    const select = $('kw-select');
+    select.innerHTML = '';
+    select.append(new Option('전체만 보기', ''));
+    results.slice(0, 40).forEach(r => select.append(new Option(r.keyword, r.keyword)));
+    function showTrend(keyword) {
+      const r = results.find(x => x.keyword === keyword);
+      Charts.renderTrend($('trend'), r ? [total, { label: r.keyword, counts: r.counts }] : [total], years);
+      if (r && ![...select.options].some(o => o.value === r.keyword)) select.append(new Option(r.keyword, r.keyword));
+      select.value = r ? r.keyword : '';
+    }
+    select.onchange = () => showTrend(select.value || null);
+
+    Charts.renderSummary($('summary'), summary);
+    const tc = $('trend-chips'); tc.innerHTML = '';
+    ['상승', '신규', '하락', '유지', '판정 보류'].forEach(t => tc.append(chip(t, results.filter(r => r.trend === t).length)));
+    Charts.renderTopBar($('top-bar'), results, { n: 12, summary, onSelect: showTrend });
+    showTrend(null);
+    List.renderTrendSection($('trend-list'), results, summary);
+    List.renderHeld($('held'), results);
+    $('list-note').textContent = summary.keywordsTotal ? `키워드 ${fmt(summary.keywordsTotal)}개 중 상위 ${fmt(results.length)}개` : `${fmt(results.length)}개 키워드`;
+  }
+
+  // 큰 파일은 입력칸에 앞부분만 보여 주고 분석에는 전체를 씀 · 입력칸을 고치면 입력칸 내용을 씀
+  let full = null;
+  function setText(text) {
+    const lines = text.split('\n');
+    full = text;
+    $('paste').value = lines.length > 14 ? lines.slice(0, 14).join('\n') + `\n… (전체 ${fmt(lines.length)}줄 · 분석에는 전체를 씁니다)` : text;
+  }
+  $('paste').addEventListener('input', () => { full = null; });
+  const current = () => full != null ? full : $('paste').value;
+
+  async function loadUrl(url, label) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      setText(await res.text());
+      run(current(), label);
+    } catch (e) {
+      status(`${url} 파일을 불러오지 못했습니다(${e.message}). 서버로 열었는지, 파일이 저장소에 있는지 확인하세요.`, true);
+    }
+  }
+
+  $('load-sample').onclick = () => { $('max-year').value = ''; loadUrl('data/sample.csv', '예시 입력(18편)'); };
+  $('load-pubmed').onclick = () => { if (!$('max-year').value) $('max-year').value = 2025; loadUrl('data/pubmed-patient-experience.csv', 'PubMed 환자경험 논문(2016~2025)'); };
+  $('run').onclick = () => run(current(), '붙여넣은 CSV');
+  $('file').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { setText(String(reader.result).replace(/^﻿/, '')); run(current(), f.name); };
+    reader.readAsText(f, 'utf-8');
+  };
+</script>
+</body>
+</html>

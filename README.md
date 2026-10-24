@@ -3,56 +3,70 @@
 
 설계는 [기획안.md](기획안.md)를 참고하세요.
 
-## 현재 상태
+## 화면 설명
 
-| 부분 | 파일 | 상태 |
-|---|---|---|
-| 화면(B): 요약 · 상위 키워드 막대 · 연도별 추이 · 추세 목록 · 내보내기 | `js/charts.js` · `js/list.js` | 구현됨 |
-| 화면 시험 페이지 (가짜 데이터) | `demo/b-demo.html` · `demo/fake-results.js` | 구현됨 |
-| 가져오기 · 키워드 추출(A): CSV 읽기 · 불용어/동의어 · 추세 판정 | `js/import.js` · `js/keywords.js` · `js/rules.js` | 이 저장소에 아직 없음 |
-| 실제 데이터를 넣는 화면 | `index.html` | 이 저장소에 아직 없음 |
+`index.html`은 CSV 목록을 넣으면 키워드를 뽑아 연도별로 늘고 줄어든 흐름(상승 · 신규 · 하락 · 유지 · 판정 보류)을 보여 줍니다. 서버와 AI 없이 브라우저에서만 돌아갑니다.
 
-그래서 지금 실행해 볼 수 있는 것은 **가짜 데이터로 그린 화면 시험 페이지**입니다. 이 페이지의 숫자는 지어낸 값이며 실제 연구 결과가 아닙니다.
+| 화면 영역 | 하는 일 |
+|---|---|
+| 왼쪽 위 **연구 목록 넣기** | CSV를 붙여넣거나 파일을 고르고 `분석하기`를 누릅니다. `예시 불러오기` · `PubMed 논문 불러오기` 버튼으로 준비된 자료를 바로 분석합니다. 읽은 건수와 건너뛴 줄 번호를 아래에 알립니다. |
+| 요약 칩 | 총 건수 · 자료 종류별 건수 · 건너뛴 줄, 그리고 판정별(상승 · 신규 · 하락 · 유지 · 판정 보류) 키워드 수 |
+| **상위 키워드** 막대 | 합계가 많은 키워드. 막대를 누르면 오른쪽 추이에 그 키워드가 함께 그려집니다. |
+| **연도별 추이** | 전체 건수의 연도별 흐름. 드롭다운으로 키워드 하나를 골라 겹쳐 볼 수 있습니다. |
+| **키워드 추세 목록** | 판정 탭 · 검색 · `CSV 내보내기` · `마크다운 내보내기` |
+| **판정 보류** | 건수가 적어 판정하지 않은 키워드. `js/rules.js`의 사전을 보강할 후보입니다. |
+
+판정 기준(기획안): 자료의 마지막 연도를 기준으로 **최근 3년 합 vs 이전 3년 합**을 비교해 증가율 +50% 이상은 상승, −50% 이하는 하락, 그 사이는 유지, 두 구간 합이 3건 미만이면 판정 보류, 이전 3년이 0건이면 신규입니다. 이 값들은 모두 `js/rules.js`에 있습니다.
 
 ## 실행 방법
 
-서버 · 설치 · 빌드가 필요 없습니다.
+서버 · 설치 · 빌드가 필요 없습니다. 단, `예시 불러오기` · `PubMed 논문 불러오기` 버튼은 파일을 읽어 오므로 아래 방법 2나 3으로 여세요. (방법 1은 CSV를 직접 붙여넣거나 `파일 선택`으로 고르면 됩니다.)
 
 ### 방법 1: 파일을 바로 열기
-1. 저장소를 내려받습니다.
-   ```bash
-   git clone https://github.com/<내 계정>/research-trend-analyzer.git
-   cd research-trend-analyzer
-   ```
-2. `demo/b-demo.html`을 브라우저로 엽니다(더블클릭).
+```bash
+git clone https://github.com/<내 계정>/research-trend-analyzer.git
+cd research-trend-analyzer
+```
+`index.html`을 브라우저로 엽니다(더블클릭).
 
-### 방법 2: 로컬 서버로 열기
-Python이 있으면 아래처럼 실행하고 브라우저에서 <http://localhost:8000/demo/b-demo.html>을 엽니다.
+### 방법 2: 로컬 서버로 열기 (권장)
 ```bash
 python -m http.server 8000
 ```
+브라우저에서 <http://localhost:8000/index.html>을 엽니다.
 
 ### 방법 3: GitHub Pages
-저장소 Settings → Pages에서 Source를 `Deploy from a branch`, 브랜치를 `main`, 폴더를 `/ (root)`로 저장하면 아래 주소에서 열립니다.
+저장소 Settings → Pages에서 Source를 `Deploy from a branch`, 브랜치를 `main`, 폴더를 `/ (root)`로 저장하면 아래 주소에서 열립니다. 설정 직후에는 배포가 끝날 때까지 1~2분 걸릴 수 있습니다.
 ```
-https://<내 계정>.github.io/research-trend-analyzer/demo/b-demo.html
+https://<내 계정>.github.io/research-trend-analyzer/index.html
 ```
-설정 직후에는 배포가 끝날 때까지 1~2분 걸릴 수 있습니다(Actions 탭의 `pages build and deployment`가 끝나면 열립니다).
+가짜 데이터로 화면만 시험하는 페이지는 `.../demo/b-demo.html`입니다. 이 페이지의 숫자는 지어낸 값입니다.
 
-## 입력 CSV 형식 (기획안 기준)
+## 입력 CSV 형식
 | 열 | 설명 |
 |---|---|
-| `year` | 연도 (4자리 숫자) |
-| `title` | 제목 |
-| `keywords` | 키워드 (`;`로 구분) |
-| `source` | 자료 종류 (과제 / 논문 등) |
+| `year` | 연도 (4자리 숫자) · 필수 |
+| `title` | 제목 · 필수 |
+| `keywords` | 키워드 (`;`로 구분) · 비어 있으면 제목에서 낱말을 뽑음 |
+| `source` | 자료 종류 (과제 / 논문 등) · 없으면 `논문` |
 
-예시 입력은 `data/sample.csv`, 이 입력으로 계산한 기대 결과는 `data/sample-expected.md`에 있습니다.
+빈 줄 · 연도가 없거나 4자리 숫자가 아닌 줄 · 제목과 키워드가 모두 빈 줄은 건너뛰고 줄 번호를 알립니다.
+
+## 데이터
+| 파일 | 내용 |
+|---|---|
+| `data/sample.csv` | 팀이 모은 환자경험 연구 · 기술 · 정책 자료 18편 (예시 입력) |
+| `data/sample-expected.md` | 예시 입력으로 기획안 규칙대로 계산한 기대 결과. 도구 결과가 이 숫자와 같아야 합니다. |
+| `data/pubmed-patient-experience.csv` | PubMed에서 제목에 patient experience · patient-reported experience · patient-centred/centered care가 든 논문(2016~2026) 4,940건의 연도 · 제목 · 저자 키워드. 저자 이름은 넣지 않았습니다. |
+
+PubMed CSV는 검색어에 따라 모인 자료라서, `환자중심성`처럼 검색어와 겹치는 키워드가 많게 나오는 것은 검색 방식 때문입니다. 실제 연구 비중이 아닙니다. 분석할 때는 진행 중인 해(2026)를 빼려고 연도 상한을 2025로 둡니다.
 
 ## 폴더 구성
 ```
-data/    예시 입력(sample.csv) · 기대 결과(sample-expected.md)
-demo/    화면 시험 페이지(b-demo.html) · 가짜 결과(fake-results.js)
-js/      charts.js · list.js (화면)
-기획안.md  설계 · 역할 분담 · 완료 기준
+index.html   화면 (입력 · 결과)
+js/          rules.js(판단 기준) · import.js(CSV 읽기) · keywords.js(키워드 추출 · 추세 판정)
+             charts.js · list.js (그래프 · 목록 · 내보내기)
+data/        예시 입력 · 기대 결과 · PubMed 논문 CSV
+demo/        가짜 데이터 화면 시험 페이지
+기획안.md     설계 · 역할 분담 · 완료 기준
 ```
