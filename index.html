@@ -117,11 +117,11 @@
           <option value="news">언론기사 (도우미 필요)</option>
           <option value="dbpia" disabled>DBpia (지원 안 함)</option>
         </select>
-        <input id="live-q" type="text" placeholder="검색어 (예: patient experience)" aria-label="검색어">
+        <input id="live-q" type="text" placeholder="검색어 (한글 · 영어 모두 가능, 예: 환자경험)" aria-label="검색어">
         <input id="live-n" type="number" min="20" max="500" step="20" value="200" aria-label="건수" title="가져올 건수">
         <button class="btn" id="live-go">검색해서 불러오기</button>
       </div>
-      <p class="hint" id="live-hint">PubMed는 제목에서 찾고 연도 칸의 범위를 씁니다. 건수는 최대 500건입니다.</p>
+      <p class="hint" id="live-hint">PubMed는 영어 색인이라 한글로 쓰면 영어로 바꿔 제목에서 찾습니다(예: 환자경험 간호). 연도 칸의 범위를 씁니다. 최대 500건.</p>
     </section>
 
     <section class="card detail" id="detail">
@@ -341,10 +341,34 @@
   const toCsv = rows => [COLUMNS].concat(rows).map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
+  // 한글 낱말을 영어 표현으로 바꿔 PubMed 질의를 만듦 · 바꿀 수 없는 낱말은 unknown에 모음
+  //   낱말 사이 공백은 AND · 한 낱말의 영어 표현들은 OR · 영어로 쓴 낱말은 그대로 제목에서 찾음
+  function translateQuery(q) {
+    const manual = (RULES.liveSearch && RULES.liveSearch.ko2en) || {};
+    const groups = [], shown = [], unknown = [];
+    q.split(/[\s,]+/).filter(Boolean).forEach(tok => {
+      if (!/[가-힣]/.test(tok)) { groups.push(`${tok}[Title]`); shown.push(tok); return; }
+      let en = manual[tok];
+      if (!en) {
+        for (const [canon, vars] of Object.entries(RULES.synonyms)) {
+          if (canon === tok || vars.includes(tok)) { en = vars.filter(v => /^[\x20-\x7e]+$/.test(v) && v.length > 3).slice(0, 5); break; }
+        }
+      }
+      if (!en || !en.length) { unknown.push(tok); return; }
+      groups.push('(' + en.map(v => (v.includes(' ') ? `"${v}"` : v) + '[Title]').join(' OR ') + ')');
+      shown.push(`${tok}→${en[0]}`);
+    });
+    return { term: groups.join(' AND '), shown: shown.join(', '), unknown, hasKorean: /[가-힣]/.test(q) };
+  }
+
   async function livePubMed(q, n, from, to) {
-    if (/[가-힣]/.test(q)) throw new Error('PubMed는 영어 검색어로 찾습니다. 예: patient experience (한국어는 RISS · 언론기사를 쓰세요)');
+    const tq = translateQuery(q);
+    if (tq.unknown.length) {
+      throw new Error(`PubMed는 영어 색인이라 한글 낱말 ${tq.unknown.map(w => '"' + w + '"').join(', ')}을(를) 영어로 바꾸지 못했습니다. 영어로 직접 쓰거나(예: patient experience), 바꿀 수 있는 낱말(환자경험 · 환자경험평가 · 환자중심성 · 환자만족도 · 환자안전 · 의료질 · 공유의사결정 · 간호 · 암 등)로 검색하세요. 한국 논문은 RISS를 쓰면 한글 그대로 찾습니다.`);
+    }
     const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
-    const term = `(${q})[Title] AND ${from}:${to}[dp]`;
+    const term = `(${tq.term}) AND ${from}:${to}[dp]`;
+    if (tq.hasKorean) status(`한글 검색어를 영어로 바꿔 PubMed 제목에서 찾는 중… (${tq.shown})`);
     const sr = await fetch(base + 'esearch.fcgi?' + new URLSearchParams({ db: 'pubmed', term, retmode: 'json', retmax: String(n), sort: 'relevance' }));
     if (!sr.ok) throw new Error('PubMed 검색 실패 ' + sr.status);
     const sj = (await sr.json()).esearchresult;
@@ -393,7 +417,7 @@
 
   $('live-source').onchange = () => {
     const v = $('live-source').value;
-    $('live-hint').textContent = v === 'pubmed' ? 'PubMed는 제목에서 찾고 연도 칸의 범위를 씁니다. 건수는 최대 500건입니다.'
+    $('live-hint').textContent = v === 'pubmed' ? 'PubMed는 영어 색인이라 한글로 쓰면 영어로 바꿔 제목에서 찾습니다(예: 환자경험 간호). 연도 칸의 범위를 씁니다. 최대 500건.'
       : v === 'riss' ? 'RISS는 관련도순으로 100건씩(최대 500건) 받고, 이 PC에서 "python server.py"를 켜 둬야 합니다.'
       : '언론기사는 구글 뉴스 제목 · 날짜 · 링크만 연도별로 받고, "python server.py"를 켜 둬야 합니다. 연도 칸의 범위를 씁니다(한 번에 최대 12년).';
   };
@@ -412,13 +436,14 @@
         status('PubMed에서 찾는 중…');
         const r = await livePubMed(q, n, from, to);
         if (!r.rows.length) { status(`PubMed에서 "${q}" 제목 검색 결과가 없습니다(${from}~${to}).`, true); return; }
-        csv = toCsv(r.rows); label = `PubMed 실시간 검색 "${q}"(전체 ${fmt(r.total)}건 중 관련도순 ${fmt(r.rows.length)}건)`;
+        const tq = translateQuery(q);
+        csv = toCsv(r.rows); label = `PubMed 실시간 검색 "${q}"${tq.hasKorean ? ' [영어로 바꿈: ' + tq.shown + ']' : ''}(전체 ${fmt(r.total)}건 중 관련도순 ${fmt(r.rows.length)}건)`;
       } else {
         csv = await liveHelper(src, q, n, from, to);
         label = `${src === 'riss' ? 'RISS' : '언론기사'} 실시간 검색 "${q}"`;
       }
       lastSource = null; setText(csv); run(current(), label);
-    } catch (err) { status(String(err.message || err), true); }
+    } catch (err) { fail(String(err.message || err)); }
     finally { $('live-go').disabled = false; }
   };
 

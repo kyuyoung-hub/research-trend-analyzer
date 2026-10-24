@@ -40,6 +40,19 @@
       '1위', '교수', '개원', '선정', '혁신', '평가', '의료', '기자', '단독', '속보', '인터뷰', '기획'
     ],
 
+    // PubMed 실시간 검색용: 한글 검색어를 영어로 바꿀 때 쓰는 말 (아래 동의어 사전에 있는 낱말은 거기서도 찾음)
+    //   PubMed는 영어 색인이라 한글로는 찾을 수 없어서, 한글 낱말을 영어 표현으로 바꿔 제목에서 찾음
+    liveSearch: {
+      ko2en: {
+        '환자경험': ['patient experience', 'patient experiences'],
+        '환자 경험': ['patient experience', 'patient experiences'],
+        '의료서비스': ['health care service', 'healthcare service', 'health service'],
+        '의료기관': ['health care facility', 'medical institution', 'hospital'],
+        '병원': ['hospital', 'hospitals'],
+        '환자': ['patient', 'patients']
+      }
+    },
+
     // ② 동의어 통합 사전 — 대표어: [같은 뜻으로 묶을 표현들] (소문자 · 하이픈과 공백은 같은 것으로 봄)
     synonyms: {
       'PREM': ['prem', 'prems', 'patient reported experience measure', 'patient reported experience measures'],
