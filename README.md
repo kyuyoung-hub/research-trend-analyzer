@@ -5,7 +5,7 @@
 
 ## 설명 영상 (23초)
 
-https://github.com/kyuyoung-hub/research-trend-analyzer/raw/feature-analyzer-dashboard/media/analyzer-demo.mp4
+https://github.com/user-attachments/assets/8f53a079-0281-48af-a44d-493900cda2b2
 
 [![설명 영상 미리보기](media/analyzer-demo-poster.png)](media/analyzer-demo.mp4)
 
