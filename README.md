@@ -3,6 +3,16 @@
 
 설계는 [기획안.md](기획안.md)를 참고하세요.
 
+## 설명 영상 (23초)
+
+<video src="media/analyzer-demo.mp4" poster="media/analyzer-demo-poster.png" controls muted playsinline width="720">
+  이 화면에서 영상이 재생되지 않으면 아래 링크로 여세요.
+</video>
+
+[![설명 영상 미리보기](media/analyzer-demo-poster.png)](media/analyzer-demo.mp4)
+
+영상이 위에서 재생되지 않으면 그림을 눌러 [media/analyzer-demo.mp4](media/analyzer-demo.mp4)를 여세요. 목소리는 Qwen3-TTS로 복제한 음성이며, 화면은 이 도구를 실제로 실행한 장면입니다.
+
 ## 화면 설명
 
 `index.html`은 CSV 목록을 넣으면 키워드를 뽑아 연도별로 늘고 줄어든 흐름(상승 · 신규 · 하락 · 유지 · 판정 보류)을 보여 줍니다. 서버와 AI 없이 브라우저에서만 돌아갑니다.
@@ -108,6 +118,7 @@ server.py    내 PC용 도우미 서버(RISS · 언론기사 실시간 검색)
 js/          rules.js(판단 기준) · import.js(CSV 읽기) · keywords.js(키워드 추출 · 추세 판정)
              charts.js · list.js (그래프 · 목록 · 내보내기)
 data/        예시 입력 · 기대 결과 · PubMed 논문 CSV
+media/       설명 영상(analyzer-demo.mp4)과 미리보기 그림
 demo/        가짜 데이터 화면 시험 페이지
 기획안.md     설계 · 역할 분담 · 완료 기준
 ```
