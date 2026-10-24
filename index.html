@@ -85,10 +85,11 @@
         <button class="btn" id="load-pubmed">PubMed 논문 불러오기</button>
         <button class="btn" id="load-riss">RISS 논문 불러오기</button>
         <button class="btn" id="load-dbpia">DBpia 논문 불러오기</button>
+        <button class="btn" id="load-news">언론기사 불러오기</button>
         <label class="btn" for="file">파일 선택</label><input id="file" type="file" accept=".csv,.tsv,.txt,.ris,text/csv" hidden>
         <button class="btn" id="run">분석하기</button>
       </div>
-      <p class="hint" style="margin-top:8px">RISS · DBpia 버튼은 저장소에 담아 둔 검색 결과(제목 · 연도)를 불러옵니다. 브라우저가 사이트에 직접 접속하지는 않습니다. 다른 내보내기 파일(CSV · RIS)은 <b>파일 선택</b>으로 읽습니다.</p>
+      <p class="hint" style="margin-top:8px">RISS · DBpia · 언론기사 버튼은 저장소에 담아 둔 검색 결과(제목 · 연도)를 불러옵니다. 브라우저가 사이트에 직접 접속하지는 않습니다. 다른 내보내기 파일(CSV · RIS)은 <b>파일 선택</b>으로 읽습니다.</p>
       <p class="opt"><label>연도 <input id="min-year" type="number" min="1900" max="2100" placeholder="처음"></label> ~ <label><input id="max-year" type="number" min="1900" max="2100" placeholder="끝"></label> <span class="hint">진행 중인 해를 빼려면 끝 연도를 입력</span></p>
       <div id="status">예시를 불러오거나 CSV를 붙여넣은 뒤 분석하기를 누르세요. 판단 기준은 <code>js/rules.js</code>에 있습니다.</div>
     </section>
@@ -213,6 +214,7 @@
   $('load-sample').onclick = e => { setActive(e.currentTarget); setYears('', ''); loadUrl('data/sample.csv', '예시 입력(18편)'); };
   $('load-pubmed').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/pubmed-patient-experience.csv', 'PubMed 환자경험 논문', 'PubMed'); };
   $('load-riss').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/riss-patient-experience.csv', 'RISS 국내학술논문(검색어 환자경험, 관련도순 952건)', 'RISS'); };
+  $('load-news').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/news-patient-experience.csv', '언론기사 제목(구글 뉴스 검색, 검색어 환자경험평가 · 환자경험 · 환자중심 의료)', '언론기사'); };
   $('load-dbpia').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/dbpia-patient-experience.csv', 'DBpia 논문(검색어 환자경험)', 'DBpia'); };
   $('run').onclick = e => { setActive(null); run(current(), '붙여넣은 목록', lastSource); };
 
