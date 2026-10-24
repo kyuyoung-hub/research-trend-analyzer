@@ -23,7 +23,7 @@
   #paste { width: 100%; box-sizing: border-box; height: 190px; padding: 8px; border: 1px solid #d1d5db; border-radius: 8px; font: 12px/1.5 ui-monospace, Consolas, monospace; resize: vertical; white-space: pre; }
   .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .btn { padding: 8px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
-  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.active, .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
   .btn.red { background: #ef4444; border-color: #ef4444; color: #fff; }
   .opt { margin-top: 10px; font-size: 13px; color: #4b5563; }
   .opt input { width: 74px; padding: 5px 7px; border: 1px solid #d1d5db; border-radius: 6px; }
@@ -81,15 +81,15 @@
       <p class="hint">CSV 첫 줄은 <code>year,title,keywords,source</code> · 붙여넣거나 파일을 고르세요</p>
       <textarea id="paste" spellcheck="false" placeholder="year,title,keywords,source&#10;2024,Patient-Reported Experience Measures in Adult Inpatient Settings,PREM;측정도구,논문"></textarea>
       <div class="buttons">
-        <button class="btn primary" id="load-sample">예시 불러오기</button>
+        <button class="btn" id="load-sample">예시 불러오기</button>
         <button class="btn" id="load-pubmed">PubMed 논문 불러오기</button>
-        <label class="btn" for="file-riss">RISS 파일 불러오기</label><input id="file-riss" type="file" accept=".csv,.tsv,.txt,.ris" hidden>
-        <label class="btn" for="file-dbpia">DBpia 파일 불러오기</label><input id="file-dbpia" type="file" accept=".csv,.tsv,.txt,.ris" hidden>
-        <label class="btn" for="file">파일 선택</label><input id="file" type="file" accept=".csv,text/csv" hidden>
+        <button class="btn" id="load-riss">RISS 논문 불러오기</button>
+        <button class="btn" id="load-dbpia">DBpia 논문 불러오기</button>
+        <label class="btn" for="file">파일 선택</label><input id="file" type="file" accept=".csv,.tsv,.txt,.ris,text/csv" hidden>
         <button class="btn" id="run">분석하기</button>
       </div>
-      <p class="hint" style="margin-top:8px">RISS · DBpia 버튼은 사이트에서 내보낸 <b>CSV · RIS 파일</b>을 고르는 버튼입니다(제목 · 연도 열이 있어야 함). 사이트에서 자동으로 받아오지는 않습니다.</p>
-      <p class="opt"><label>연도 상한 <input id="max-year" type="number" min="1900" max="2100" placeholder="전체"></label> <span class="hint">진행 중인 해를 빼려면 입력</span></p>
+      <p class="hint" style="margin-top:8px">RISS · DBpia 버튼은 저장소에 담아 둔 검색 결과(제목 · 연도)를 불러옵니다. 브라우저가 사이트에 직접 접속하지는 않습니다. 다른 내보내기 파일(CSV · RIS)은 <b>파일 선택</b>으로 읽습니다.</p>
+      <p class="opt"><label>연도 <input id="min-year" type="number" min="1900" max="2100" placeholder="처음"></label> ~ <label><input id="max-year" type="number" min="1900" max="2100" placeholder="끝"></label> <span class="hint">진행 중인 해를 빼려면 끝 연도를 입력</span></p>
       <div id="status">예시를 불러오거나 CSV를 붙여넣은 뒤 분석하기를 누르세요. 판단 기준은 <code>js/rules.js</code>에 있습니다.</div>
     </section>
 
@@ -126,6 +126,13 @@
   const $ = id => document.getElementById(id);
   const fmt = n => Number(n).toLocaleString('ko-KR');
   const maxYear = () => Number($('max-year').value) || null;
+  const minYear = () => Number($('min-year').value) || null;
+
+  // 마지막으로 누른 자료 버튼을 파란색으로 표시
+  function setActive(el) {
+    document.querySelectorAll('.buttons .btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
 
   function status(msg, isError) { $('status').textContent = msg; $('status').className = isError ? 'error' : ''; }
 
@@ -140,8 +147,8 @@
     const parsed = Importer.readAny(text, { defaultSource: sourceName || '논문' });
     if (parsed.error) { status(parsed.error, true); return; }
     let records = parsed.records, dropped = 0;
-    const my = maxYear();
-    if (my) { const n = records.length; records = records.filter(r => r.year <= my); dropped = n - records.length; }
+    const my = maxYear(), ny = minYear();
+    if (my || ny) { const n = records.length; records = records.filter(r => (!my || r.year <= my) && (!ny || r.year >= ny)); dropped = n - records.length; }
     if (!records.length) { status('분석할 줄이 없습니다. year · title 열과 연도(4자리 숫자)를 확인하세요.', true); return; }
 
     const { results, summary } = Keywords.analyze(records, RULES);
@@ -149,7 +156,7 @@
 
     const msg = [`${label}: ${fmt(records.length)}건을 읽었습니다.`];
     msg.push(parsed.skipped.length ? `건너뛴 줄 ${parsed.skipped.length}개(줄 번호: ${parsed.skipped.slice(0, 8).join(', ')}${parsed.skipped.length > 8 ? ' …' : ''})` : '건너뛴 줄 없음.');
-    if (dropped) msg.push(`${my}년 이후 ${dropped}건은 제외했습니다.`);
+    if (dropped) msg.push(`연도 범위(${ny || '처음'}~${my || '끝'}) 밖 ${dropped}건은 제외했습니다.`);
     msg.push(`판정: 최근 3년(${summary.lastYear - 2}~${summary.lastYear}) vs 이전 3년(${summary.lastYear - 5}~${summary.lastYear - 3}).`);
     status(msg.join(' '));
 
@@ -190,20 +197,24 @@
   $('paste').addEventListener('input', () => { full = null; lastSource = null; });
   const current = () => full != null ? full : $('paste').value;
 
-  async function loadUrl(url, label) {
+  async function loadUrl(url, label, sourceName) {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(res.status);
+      lastSource = sourceName || null;
       setText(await res.text());
-      run(current(), label);
+      run(current(), label, sourceName);
     } catch (e) {
       status(`${url} 파일을 불러오지 못했습니다(${e.message}). 서버로 열었는지, 파일이 저장소에 있는지 확인하세요.`, true);
     }
   }
 
-  $('load-sample').onclick = () => { $('max-year').value = ''; loadUrl('data/sample.csv', '예시 입력(18편)'); };
-  $('load-pubmed').onclick = () => { if (!$('max-year').value) $('max-year').value = 2025; loadUrl('data/pubmed-patient-experience.csv', 'PubMed 환자경험 논문(2016~2025)'); };
-  $('run').onclick = () => run(current(), '붙여넣은 목록', lastSource);
+  function setYears(from, to) { $('min-year').value = from || ''; $('max-year').value = to || ''; }
+  $('load-sample').onclick = e => { setActive(e.currentTarget); setYears('', ''); loadUrl('data/sample.csv', '예시 입력(18편)'); };
+  $('load-pubmed').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/pubmed-patient-experience.csv', 'PubMed 환자경험 논문', 'PubMed'); };
+  $('load-riss').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/riss-patient-experience.csv', 'RISS 국내학술논문(검색어 환자경험, 관련도순 952건)', 'RISS'); };
+  $('load-dbpia').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/dbpia-patient-experience.csv', 'DBpia 논문(검색어 환자경험)', 'DBpia'); };
+  $('run').onclick = e => { setActive(null); run(current(), '붙여넣은 목록', lastSource); };
 
   // 한국 사이트 파일은 EUC-KR(CP949)인 경우가 있어, UTF-8로 읽어 보고 안 되면 EUC-KR로 읽음
   async function readFileText(file) {
@@ -214,15 +225,13 @@
   function bindFile(inputId, sourceName) {
     $(inputId).onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
-      lastSource = sourceName;
+      lastSource = sourceName; setActive($('file').labels[0]);
       setText(await readFileText(f));
       run(current(), sourceName ? `${sourceName} 파일(${f.name})` : f.name, sourceName);
       e.target.value = '';
     };
   }
   bindFile('file', null);
-  bindFile('file-riss', 'RISS');
-  bindFile('file-dbpia', 'DBpia');
 </script>
 </body>
 </html>

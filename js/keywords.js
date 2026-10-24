@@ -42,18 +42,43 @@
     if (authorKws.length) return found; // keywords 열이 있으면 그것만 씀
 
     // keywords 열이 비어 있으면 제목에서: ① 동의어 사전의 표현 ② 남은 낱말 (영문 3자 이상 · 한글 2자 이상)
+    //   한글 표현은 4글자 이상이거나 띄어쓰기가 있을 때만 제목 안에서 찾고, 짧은 표현(간호 · 의사 · 암 …)은 낱말 전체가 같을 때만 같은 것으로 봄
+    //   (예: '의사소통'을 '의사'로 세지 않기 위해)
     let rest = ' ' + norm(rec.title) + ' ';
     m.phrases.forEach(p => {
-      if (containsWord(rest.trim(), p)) {
+      const kor = /[가-힣]/.test(p);
+      if (kor) {
+        if ((p.length >= 4 || p.includes(' ')) && rest.includes(p)) {
+          found.add(m.variantToCanon.get(p));
+          rest = rest.split(p).join(' ');
+        }
+      } else if (containsWord(rest.trim(), p)) {
         found.add(m.variantToCanon.get(p));
-        if (!/[가-힣]/.test(p)) rest = rest.split(' ' + p + ' ').join('  ');
+        rest = rest.split(' ' + p + ' ').join('  ');
       }
     });
     rest.split(' ').filter(Boolean).forEach(w => {
-      const minLen = /[가-힣]/.test(w) ? 2 : 3;
-      if (w.length >= minLen && !/^\d+$/.test(w)) add(w);
+      if (/^\d+$/.test(w)) return;
+      if (!/[가-힣]/.test(w)) { if (w.length >= 3) add(w); return; }
+      if (m.stop.has(w)) return;
+      let canon = m.variantToCanon.get(w);
+      if (!canon) {
+        const t = stripParticle(w);
+        if (t.length < 2 || m.stop.has(t)) return;
+        canon = m.variantToCanon.get(t) || t;
+      }
+      found.add(canon);
     });
     return found;
+  }
+
+  // 한글 낱말 끝의 조사 · 어미를 한 번 떼어 같은 낱말로 묶음 (예: 환자경험에 → 환자경험) · 떼고 2글자 미만이면 그대로 둠
+  const PARTICLES = ['에서의', '에서는', '으로의', '으로서', '으로써', '에서', '으로', '에게', '까지', '부터', '과의', '와의', '에는', '에도', '이라', '라는', '하는', '되는', '하여', '의', '은', '는', '이', '가', '을', '를', '에', '와', '과', '도', '로', '들'];
+  function stripParticle(w) {
+    for (const p of PARTICLES) {
+      if (w.endsWith(p) && w.length - p.length >= 2) return w.slice(0, -p.length);
+    }
+    return w;
   }
 
   function judge(counts, lastYear, t) {
