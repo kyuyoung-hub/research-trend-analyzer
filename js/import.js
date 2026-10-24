@@ -69,7 +69,7 @@
     const iExtra = {};
     EXTRA.forEach(k => { iExtra[k] = col(k); });
     if (iYear < 0 || iTitle < 0) {
-      return { records: [], skipped: [], error: '머리줄에 year · title 열이 있어야 합니다. (공통 열: year, title, keywords, source · 발행연도 · 제목 · 주제어 같은 이름도 읽습니다)' };
+      return { records: [], skipped: [], error: '읽을 수 있는 자료가 없습니다. 첫 줄에 열 이름(year,title,keywords,source)을 쓰거나, 줄마다 "2024,제목" 꼴로 넣으세요. (발행연도 · 제목 · 주제어 같은 이름도 읽습니다)' };
     }
     const records = [], skipped = [];
     parsed.rows.forEach(r => {
@@ -116,16 +116,47 @@
     return { records, skipped, error };
   }
 
-  // CSV(쉼표 · 탭)와 RIS를 알아서 구분해 읽음
+  // 머리줄 없이 붙여넣은 목록: "2024,제목,키워드;키워드,출처" · "2024 제목" · "제목 (2024)" 꼴의 줄을 읽음
+  function readHeaderless(text, opts) {
+    opts = opts || {};
+    const defaultSource = opts.defaultSource || '논문';
+    const lines = String(text).replace(/^﻿/, '').split(/\r\n|\r|\n/);
+    let last = lines.length - 1;
+    while (last >= 0 && !lines[last].trim()) last--;
+    const records = [], skipped = [];
+    const blank = { type: '', publisher: '', country: '', field: '', note: '', url: '', open: '', id: '' };
+    lines.slice(0, last + 1).forEach((raw, i) => {
+      const l = raw.trim();
+      if (!l) { skipped.push(i + 1); return; }
+      let m = l.match(/^((?:19|20)\d{2})\s*[,\t ]\s*(.+)$/);
+      if (m) {
+        const cells = (parseCSV('h\n' + m[2]).rows[0] || { cells: [m[2]] }).cells;
+        records.push(Object.assign({ line: i + 1, year: Number(m[1]), title: (cells[0] || '').trim(), keywords: (cells[1] || '').trim(), source: (cells[2] || '').trim() || defaultSource }, blank));
+        return;
+      }
+      m = l.match(/^(.+?)[\s,\t]*[\(\[]?((?:19|20)\d{2})[\)\]]?\s*$/);
+      if (m) {
+        records.push(Object.assign({ line: i + 1, year: Number(m[2]), title: m[1].trim(), keywords: '', source: defaultSource }, blank));
+        return;
+      }
+      skipped.push(i + 1);
+    });
+    return { records, skipped, error: null, note: '머리줄(year,title,…)이 없어 줄마다 "연도,제목" 꼴로 읽었습니다.' };
+  }
+
+  // CSV(쉼표 · 탭) · RIS · 머리줄 없는 목록을 알아서 구분해 읽음
   function readAny(text, opts) {
     const s = String(text == null ? '' : text);
     if (/^\s*TY\s{1,2}-/m.test(s)) return readRIS(s, opts);
     const first = s.replace(/^﻿/, '').split(/\r\n|\r|\n/)[0] || '';
-    if (first.includes('\t') && first.split('\t').length > first.split(',').length) {
-      // 탭으로 나눈 표(엑셀 복사)는 쉼표 표로 바꿔 읽음
-      return readRecords(toCommaTable(text), opts);
+    const result = first.includes('\t') && first.split('\t').length > first.split(',').length
+      ? readRecords(toCommaTable(text), opts)   // 탭으로 나눈 표(엑셀 복사)는 쉼표 표로 바꿔 읽음
+      : readRecords(s, opts);
+    if (result.error && s.trim()) {
+      const h = readHeaderless(s, opts);
+      if (h.records.length) return h;
     }
-    return readRecords(s, opts);
+    return result;
   }
 
   function toCommaTable(text) {
@@ -134,5 +165,5 @@
       .join('\r\n');
   }
 
-  return { parseCSV, readRecords, readRIS, readAny };
+  return { parseCSV, readRecords, readRIS, readHeaderless, readAny };
 });

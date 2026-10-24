@@ -7,7 +7,7 @@
 // 판정(trend)은 A가 rules.js 기준으로 붙여서 넘김 · 이 파일은 받은 값을 그리기만 함
 (function () {
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const SOURCE_COLORS = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6'];
+  const SOURCE_COLORS = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4'];
 
   function el(tag, cls, text) {
     const node = document.createElement(tag);

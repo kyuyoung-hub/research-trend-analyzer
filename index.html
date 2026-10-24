@@ -99,6 +99,7 @@
         <button class="btn" id="load-riss">RISS 논문 불러오기</button>
         <button class="btn" id="load-dbpia">DBpia 논문 불러오기</button>
         <button class="btn" id="load-news">언론기사 불러오기</button>
+        <button class="btn" id="load-all" title="예시 · PubMed · RISS · DBpia · 언론기사를 한 화면에 합쳐서 봅니다">전체 통합 보기</button>
         <label class="btn" for="file">파일 선택</label><input id="file" type="file" accept=".csv,.tsv,.txt,.ris,text/csv" hidden>
         <button class="btn" id="run">분석하기</button>
       </div>
@@ -171,6 +172,14 @@
   }
 
   function status(msg, isError) { $('status').textContent = msg; $('status').className = isError ? 'error' : ''; }
+  // 분석하지 못했을 때: 이전 결과가 그대로 남아 분석된 것처럼 보이지 않게 결과를 치우고 이유를 오른쪽에도 보여 줌
+  function fail(msg) {
+    status(msg, true);
+    $('result').hidden = true; $('bottom').hidden = true;
+    const w = $('welcome'); w.hidden = false;
+    w.innerHTML = ''; const b = document.createElement('strong'); b.textContent = '분석하지 못했습니다.';
+    w.append(b, document.createElement('br'), document.createTextNode(msg));
+  }
 
   function chip(label, value) {
     const c = document.createElement('div'); c.className = 'chip';
@@ -182,17 +191,18 @@
   let currentRecords = [];
   function run(text, label, sourceName) {
     const parsed = Importer.readAny(text, { defaultSource: sourceName || '논문' });
-    if (parsed.error) { status(parsed.error, true); return; }
+    if (parsed.error) { fail(parsed.error); return; }
     let records = parsed.records, dropped = 0;
     const my = maxYear(), ny = minYear();
     if (my || ny) { const n = records.length; records = records.filter(r => (!my || r.year <= my) && (!ny || r.year >= ny)); dropped = n - records.length; }
-    if (!records.length) { status('분석할 줄이 없습니다. year · title 열과 연도(4자리 숫자)를 확인하세요.', true); return; }
+    if (!records.length) { fail('연도 범위 안에 분석할 자료가 없습니다. 연도 칸(처음~끝)을 확인하세요.'); return; }
 
     const { results, summary } = Keywords.analyze(records, RULES);
     summary.skipped = parsed.skipped;
 
     currentRecords = parsed.records;
     const msg = [`[${new Date().toLocaleTimeString('ko-KR')} 분석] ${label}: ${fmt(records.length)}건을 읽었습니다.`];
+    if (parsed.note) msg.push(parsed.note);
     msg.push(parsed.skipped.length ? `건너뛴 줄 ${parsed.skipped.length}개(줄 번호: ${parsed.skipped.slice(0, 8).join(', ')}${parsed.skipped.length > 8 ? ' …' : ''})` : '건너뛴 줄 없음.');
     if (dropped) msg.push(`연도 범위(${ny || '처음'}~${my || '끝'}) 밖 ${dropped}건은 제외했습니다.`);
     msg.push(`판정: 최근 3년(${summary.lastYear - 2}~${summary.lastYear}) vs 이전 3년(${summary.lastYear - 5}~${summary.lastYear - 3}).`);
@@ -253,10 +263,29 @@
   $('load-pubmed').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/pubmed-patient-experience.csv', 'PubMed 환자경험 논문', 'PubMed'); };
   $('load-riss').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/riss-patient-experience.csv', 'RISS 국내학술논문(검색어 환자경험, 관련도순 952건)', 'RISS'); };
   $('load-news').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/news-patient-experience.csv', '언론기사 제목(구글 뉴스 검색, 검색어 환자경험평가 · 환자경험 · 환자중심 의료)', '언론기사'); };
+  // 저장해 둔 다섯 자료를 한 화면에 합침 (출처별로 막대 색이 나뉨)
+  $('load-all').onclick = async e => {
+    setActive(e.currentTarget); setYears(2016, 2025);
+    const parts = [
+      ['data/sample.csv', '예시 18편(팀)'], ['data/pubmed-patient-experience.csv', 'PubMed'], ['data/riss-patient-experience.csv', 'RISS'],
+      ['data/dbpia-patient-experience.csv', 'DBpia'], ['data/news-patient-experience.csv', '언론기사']
+    ];
+    try {
+      status('저장해 둔 자료 5개를 합치는 중…');
+      const rows = [];
+      for (const [url, name] of parts) {
+        const res = await fetch(url); if (!res.ok) throw new Error(url + ' ' + res.status);
+        const parsed = Importer.readAny((await res.text()).replace(/^\uFEFF/, ''), { defaultSource: name });
+        parsed.records.forEach(r => rows.push([r.id, r.year, r.title, r.keywords, name, r.type || (name === '예시 18편(팀)' ? r.source : ''), r.publisher, r.country, r.field, r.note, r.url, r.open]));
+      }
+      lastSource = null; setText(toCsv(rows));
+      run(current(), `통합(예시 · PubMed · RISS · DBpia · 언론기사 ${fmt(rows.length)}건 합침)`);
+    } catch (err) { status('합치지 못했습니다: ' + (err.message || err) + ' (서버로 열었는지 확인하세요)', true); }
+  };
   $('load-dbpia').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/dbpia-patient-experience.csv', 'DBpia 논문(검색어 환자경험)', 'DBpia'); };
   $('run').onclick = e => {
     const t = current();
-    if (!t.trim()) { status('분석할 목록이 비어 있습니다. 예시를 불러오거나 CSV를 붙여넣으세요.', true); return; }
+    if (!t.trim()) { fail('분석할 목록이 비어 있습니다. 예시를 불러오거나 CSV를 붙여넣으세요.'); return; }
     setActive(e.currentTarget);
     run(t, '붙여넣은 목록', lastSource);
     const r = $('result');
