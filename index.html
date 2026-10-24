@@ -68,6 +68,18 @@
   .held-list li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #eef0f4; font-size: 13px; }
   .empty { color: var(--muted); font-size: 13px; }
   .welcome { color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .left { display: grid; gap: 14px; min-width: 0; }
+  .live-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .live-row select, .live-row input { padding: 7px 8px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+  .live-row input[type=text] { flex: 1; min-width: 120px; }
+  .live-row input[type=number] { width: 70px; }
+  .detail dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 13px; }
+  .detail dt { color: var(--muted); }
+  .detail dd { margin: 0; word-break: break-word; }
+  .detail dd.none { color: #9ca3af; }
+  .detail a { color: var(--blue); }
+  .flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 3px #93c5fd; } to { box-shadow: 0 0 0 0 transparent; } }
   @media (max-width: 900px) { .body { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -76,9 +88,10 @@
   <header><h1>환자경험평가 연구 동향 분석기</h1><span>연구 목록을 넣으면 키워드를 뽑아 연도별 추세(상승·신규·하락)로 정리합니다</span></header>
 
   <div class="body">
+    <div class="left">
     <section class="card input-card">
       <h2>연구 목록 넣기</h2>
-      <p class="hint">CSV 첫 줄은 <code>year,title,keywords,source</code> · 붙여넣거나 파일을 고르세요</p>
+      <p class="hint">CSV 첫 줄은 <code>year,title,keywords,source</code> · 붙여넣거나 파일을 고르세요 · <b>목록의 줄을 누르면</b> 아래에 그 자료의 정보(①~⑨)가 나옵니다</p>
       <textarea id="paste" spellcheck="false" placeholder="year,title,keywords,source&#10;2024,Patient-Reported Experience Measures in Adult Inpatient Settings,PREM;측정도구,논문"></textarea>
       <div class="buttons">
         <button class="btn" id="load-sample">예시 불러오기</button>
@@ -93,6 +106,28 @@
       <p class="opt"><label>연도 <input id="min-year" type="number" min="1900" max="2100" placeholder="처음"></label> ~ <label><input id="max-year" type="number" min="1900" max="2100" placeholder="끝"></label> <span class="hint">진행 중인 해를 빼려면 끝 연도를 입력</span></p>
       <div id="status">예시를 불러오거나 CSV를 붙여넣은 뒤 분석하기를 누르세요. 판단 기준은 <code>js/rules.js</code>에 있습니다.</div>
     </section>
+
+    <section class="card live-card">
+      <h2>실시간 검색 <small>검색어를 넣으면 그 자리에서 찾아 옵니다</small></h2>
+      <div class="live-row">
+        <select id="live-source" aria-label="출처">
+          <option value="pubmed">PubMed (바로 검색)</option>
+          <option value="riss">RISS (도우미 필요)</option>
+          <option value="news">언론기사 (도우미 필요)</option>
+          <option value="dbpia" disabled>DBpia (지원 안 함)</option>
+        </select>
+        <input id="live-q" type="text" placeholder="검색어 (예: patient experience)" aria-label="검색어">
+        <input id="live-n" type="number" min="20" max="500" step="20" value="200" aria-label="건수" title="가져올 건수">
+        <button class="btn" id="live-go">검색해서 불러오기</button>
+      </div>
+      <p class="hint" id="live-hint">PubMed는 제목에서 찾고 연도 칸의 범위를 씁니다. 건수는 최대 500건입니다.</p>
+    </section>
+
+    <section class="card detail" id="detail">
+      <h2>선택한 자료 <small>목록의 줄을 누르면 표시됩니다</small></h2>
+      <div id="detail-body" class="empty">아직 고른 자료가 없습니다.</div>
+    </section>
+    </div>
 
     <div class="right" id="right">
       <section class="card welcome" id="welcome">
@@ -131,7 +166,7 @@
 
   // 마지막으로 누른 자료 버튼을 파란색으로 표시
   function setActive(el) {
-    document.querySelectorAll('.buttons .btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.buttons .btn, #live-go').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
   }
 
@@ -144,6 +179,7 @@
     c.append(l, v); return c;
   }
 
+  let currentRecords = [];
   function run(text, label, sourceName) {
     const parsed = Importer.readAny(text, { defaultSource: sourceName || '논문' });
     if (parsed.error) { status(parsed.error, true); return; }
@@ -155,7 +191,8 @@
     const { results, summary } = Keywords.analyze(records, RULES);
     summary.skipped = parsed.skipped;
 
-    const msg = [`${label}: ${fmt(records.length)}건을 읽었습니다.`];
+    currentRecords = parsed.records;
+    const msg = [`[${new Date().toLocaleTimeString('ko-KR')} 분석] ${label}: ${fmt(records.length)}건을 읽었습니다.`];
     msg.push(parsed.skipped.length ? `건너뛴 줄 ${parsed.skipped.length}개(줄 번호: ${parsed.skipped.slice(0, 8).join(', ')}${parsed.skipped.length > 8 ? ' …' : ''})` : '건너뛴 줄 없음.');
     if (dropped) msg.push(`연도 범위(${ny || '처음'}~${my || '끝'}) 밖 ${dropped}건은 제외했습니다.`);
     msg.push(`판정: 최근 3년(${summary.lastYear - 2}~${summary.lastYear}) vs 이전 3년(${summary.lastYear - 5}~${summary.lastYear - 3}).`);
@@ -196,7 +233,8 @@
   }
   let lastSource = null;
   $('paste').addEventListener('input', () => { full = null; lastSource = null; });
-  const current = () => full != null ? full : $('paste').value;
+  // 큰 파일을 줄여 보여 주려고 붙인 "… (전체 N줄 …" 줄은 분석에서 뺌
+  const current = () => (full != null ? full : $('paste').value).replace(/\n… \(전체 [\d,]+줄[^\n]*$/, '');
 
   async function loadUrl(url, label, sourceName) {
     try {
@@ -216,7 +254,144 @@
   $('load-riss').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/riss-patient-experience.csv', 'RISS 국내학술논문(검색어 환자경험, 관련도순 952건)', 'RISS'); };
   $('load-news').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/news-patient-experience.csv', '언론기사 제목(구글 뉴스 검색, 검색어 환자경험평가 · 환자경험 · 환자중심 의료)', '언론기사'); };
   $('load-dbpia').onclick = e => { setActive(e.currentTarget); setYears(2016, 2025); loadUrl('data/dbpia-patient-experience.csv', 'DBpia 논문(검색어 환자경험)', 'DBpia'); };
-  $('run').onclick = e => { setActive(null); run(current(), '붙여넣은 목록', lastSource); };
+  $('run').onclick = e => {
+    const t = current();
+    if (!t.trim()) { status('분석할 목록이 비어 있습니다. 예시를 불러오거나 CSV를 붙여넣으세요.', true); return; }
+    setActive(e.currentTarget);
+    run(t, '붙여넣은 목록', lastSource);
+    const r = $('result');
+    if (!r.hidden) { r.scrollIntoView({ behavior: 'smooth', block: 'start' }); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
+  };
+
+  // ---- 목록의 줄을 누르면 기획안의 ① ~ ⑨ 항목을 보여 줌 ----
+  function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+  function showDetail(rec) {
+    const body = $('detail-body');
+    body.className = ''; body.textContent = '';
+    const site = rec.type ? [rec.source, hostOf(rec.url)].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ') : hostOf(rec.url);
+    const rows = [
+      ['① 제목', rec.title],
+      ['② 저자 또는 발행기관', rec.publisher],
+      ['③ 발표연도', rec.year],
+      ['④ 국가', rec.country],
+      ['⑤ 자료 유형 · 분야', [rec.type || rec.source, rec.field].filter(Boolean).join(' · ')],
+      ['⑥ 내용과 선정 이유', rec.note],
+      ['⑦ 출처 사이트', site],
+      ['⑧ 원문 링크/DOI', rec.url],
+      ['⑨ 원문 공개 여부', rec.open]
+    ];
+    const dl = document.createElement('dl');
+    rows.forEach(([k, v]) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd');
+      const text = v == null ? '' : String(v);
+      if (!text) { dd.className = 'none'; dd.textContent = '— (이 자료에 없음)'; }
+      else if (k.startsWith('⑧') && /^https?:\/\//.test(text)) {
+        const a = document.createElement('a'); a.href = text; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = text; dd.append(a);
+      } else dd.textContent = text;
+      dl.append(dt, dd);
+    });
+    body.append(dl);
+    if (rec.keywords) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = '키워드: ' + rec.keywords; body.append(p); }
+  }
+  function onListClick() {
+    const ta = $('paste');
+    const line = ta.value.slice(0, ta.selectionStart).split('\n').length;
+    const rec = currentRecords.find(r => r.line === line);
+    const body = $('detail-body');
+    if (rec) { showDetail(rec); return; }
+    body.className = 'empty';
+    body.textContent = line === 1 ? '첫 줄은 열 이름입니다. 자료가 있는 줄을 누르세요.' : `${line}번째 줄은 읽지 않은 줄(빈 줄 · 연도 없음)이거나 아직 분석하지 않았습니다. 분석하기를 먼저 누르세요.`;
+  }
+  $('paste').addEventListener('click', onListClick);
+  $('paste').addEventListener('keyup', e => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key)) onListClick(); });
+
+  // ---- 실시간 검색 ----
+  const COLUMNS = ['id', 'year', 'title', 'keywords', 'source', 'type', 'publisher', 'country', 'field', 'note', 'url', 'open'];
+  const csvCell = v => { const t = v == null ? '' : String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const toCsv = rows => [COLUMNS].concat(rows).map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  async function livePubMed(q, n, from, to) {
+    if (/[가-힣]/.test(q)) throw new Error('PubMed는 영어 검색어로 찾습니다. 예: patient experience (한국어는 RISS · 언론기사를 쓰세요)');
+    const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+    const term = `(${q})[Title] AND ${from}:${to}[dp]`;
+    const sr = await fetch(base + 'esearch.fcgi?' + new URLSearchParams({ db: 'pubmed', term, retmode: 'json', retmax: String(n), sort: 'relevance' }));
+    if (!sr.ok) throw new Error('PubMed 검색 실패 ' + sr.status);
+    const sj = (await sr.json()).esearchresult;
+    if (Number(sj.count) > 200000) throw new Error('검색어가 너무 넓거나 인식되지 않았습니다(결과 ' + Number(sj.count).toLocaleString('ko-KR') + '건). 더 구체적인 영어 검색어를 넣으세요.');
+    const ids = sj.idlist || [];
+    if (!ids.length) return { rows: [], total: Number(sj.count || 0) };
+    const rows = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const fr = await fetch(base + 'efetch.fcgi?' + new URLSearchParams({ db: 'pubmed', retmode: 'xml', id: ids.slice(i, i + 100).join(',') }));
+      if (!fr.ok) throw new Error('PubMed 내려받기 실패 ' + fr.status);
+      const doc = new DOMParser().parseFromString(await fr.text(), 'text/xml');
+      doc.querySelectorAll('PubmedArticle').forEach(a => {
+        const t = sel => (a.querySelector(sel) || {}).textContent || '';
+        const pmid = t('MedlineCitation > PMID');
+        const year = t('JournalIssue > PubDate > Year') || t('JournalIssue > PubDate > MedlineDate').slice(0, 4) || t('ArticleDate > Year');
+        const art = [...a.querySelectorAll('ArticleId')];
+        const doi = (art.find(x => x.getAttribute('IdType') === 'doi') || {}).textContent;
+        const pmc = art.find(x => x.getAttribute('IdType') === 'pmc');
+        const kws = [...a.querySelectorAll('Keyword')].map(k => k.textContent.trim()).filter(Boolean);
+        rows.push(['PM' + pmid, year, t('ArticleTitle').trim(), kws.join(';'), 'PubMed', '학술논문', t('Journal > Title').trim(), '', '', '',
+          doi ? 'https://doi.org/' + doi.trim() : 'https://pubmed.ncbi.nlm.nih.gov/' + pmid + '/', pmc ? '공개(PMC 전문)' : '']);
+      });
+      if (i + 100 < ids.length) await wait(400);
+    }
+    return { rows, total: Number(sj.count || rows.length) };
+  }
+
+  // RISS · 언론기사: 내 PC의 도우미(server.py)가 대신 접속함
+  function helperBase() {
+    const local = ['127.0.0.1', 'localhost'].includes(location.hostname);
+    return local && location.port === '8777' ? '' : 'http://127.0.0.1:8777';
+  }
+  async function liveHelper(kind, q, n, from, to) {
+    const base = helperBase();
+    try { const ping = await fetch(base + '/api/ping'); if (!ping.ok) throw new Error(); }
+    catch (e) { throw new Error('도우미 서버가 켜져 있지 않습니다. 이 PC의 터미널에서 "python server.py"를 실행한 뒤 http://127.0.0.1:8777/index.html 에서 다시 시도하세요.'); }
+    const pages = Math.min(5, Math.ceil(n / 100));
+    const params = kind === 'riss' ? { q, pages: String(pages) } : { q, from: String(from), to: String(to) };
+    const secs = kind === 'riss' ? (pages - 1) * 12 + 6 : (to - from) * 4 + (to - from + 1) * 2;
+    status(`${kind === 'riss' ? 'RISS' : '언론기사'}에서 찾는 중… 사이트에 부담을 주지 않으려고 천천히 받아 약 ${secs}초 걸립니다. 기다려 주세요.`);
+    const res = await fetch(base + '/api/' + kind + '?' + new URLSearchParams(params));
+    const text = await res.text();
+    if (!res.ok) throw new Error(text);
+    return text;
+  }
+
+  $('live-source').onchange = () => {
+    const v = $('live-source').value;
+    $('live-hint').textContent = v === 'pubmed' ? 'PubMed는 제목에서 찾고 연도 칸의 범위를 씁니다. 건수는 최대 500건입니다.'
+      : v === 'riss' ? 'RISS는 관련도순으로 100건씩(최대 500건) 받고, 이 PC에서 "python server.py"를 켜 둬야 합니다.'
+      : '언론기사는 구글 뉴스 제목 · 날짜 · 링크만 연도별로 받고, "python server.py"를 켜 둬야 합니다. 연도 칸의 범위를 씁니다(한 번에 최대 12년).';
+  };
+  $('live-go').onclick = async e => {
+    const src = $('live-source').value, q = $('live-q').value.trim();
+    const n = Math.max(20, Math.min(500, Number($('live-n').value) || 200));
+    if (!q) { status('검색어를 입력하세요.', true); return; }
+    const to = maxYear() || new Date().getFullYear() - 1, from = minYear() || to - 9;
+    if (!$('min-year').value) $('min-year').value = from;
+    if (!$('max-year').value) $('max-year').value = to;
+    setActive(e.currentTarget);
+    $('live-go').disabled = true;
+    try {
+      let csv, label;
+      if (src === 'pubmed') {
+        status('PubMed에서 찾는 중…');
+        const r = await livePubMed(q, n, from, to);
+        if (!r.rows.length) { status(`PubMed에서 "${q}" 제목 검색 결과가 없습니다(${from}~${to}).`, true); return; }
+        csv = toCsv(r.rows); label = `PubMed 실시간 검색 "${q}"(전체 ${fmt(r.total)}건 중 관련도순 ${fmt(r.rows.length)}건)`;
+      } else {
+        csv = await liveHelper(src, q, n, from, to);
+        label = `${src === 'riss' ? 'RISS' : '언론기사'} 실시간 검색 "${q}"`;
+      }
+      lastSource = null; setText(csv); run(current(), label);
+    } catch (err) { status(String(err.message || err), true); }
+    finally { $('live-go').disabled = false; }
+  };
 
   // 한국 사이트 파일은 EUC-KR(CP949)인 경우가 있어, UTF-8로 읽어 보고 안 되면 EUC-KR로 읽음
   async function readFileText(file) {

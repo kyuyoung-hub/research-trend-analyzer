@@ -45,8 +45,18 @@
     year: ['year', '연도', '발행연도', '발행년도', '출판연도', '출판년도', '발행일', '게재년도', '발행년', 'pubyear', 'publication year', 'py'],
     title: ['title', '제목', '논문명', '논문제목', '표제', '자료명', 'article title', 'ti'],
     keywords: ['keywords', '키워드', '주제어', '핵심어', '저자키워드', 'keyword', 'author keywords', 'kw'],
-    source: ['source', '자료유형', '자료종류', '유형', '구분', 'type']
+    source: ['source', '출처'],
+    // 아래는 자료를 눌렀을 때 보여 줄 항목 (기획안 ① ~ ⑨): 있으면 읽고 없으면 비워 둠
+    type: ['type', '자료유형', '자료종류', '유형', '구분'],
+    publisher: ['publisher', '발행기관', '발행처', '저자 또는 발행기관', '학술지', '저널', 'journal', '언론사'],
+    country: ['country', '국가'],
+    field: ['field', '분야'],
+    note: ['note', '내용', '내용과 선정 이유', '선정 이유'],
+    url: ['url', '링크', '원문링크', '원문 링크', 'doi'],
+    open: ['open', '공개', '공개여부', '원문 공개 여부'],
+    id: ['id', '번호']
   };
+  const EXTRA = ['type', 'publisher', 'country', 'field', 'note', 'url', 'open', 'id'];
 
   // 필수 열: year · title / 선택 열: keywords · source (source가 없으면 opts.defaultSource, 그것도 없으면 '논문')
   // 연도 칸이 "2022.03" · "2022-03-01"처럼 앞 4자리가 연도면 그 연도로 읽음
@@ -56,6 +66,8 @@
     const parsed = parseCSV(text);
     const col = name => parsed.header.findIndex(h => ALIASES[name].includes(h));
     const iYear = col('year'), iTitle = col('title'), iKeywords = col('keywords'), iSource = col('source');
+    const iExtra = {};
+    EXTRA.forEach(k => { iExtra[k] = col(k); });
     if (iYear < 0 || iTitle < 0) {
       return { records: [], skipped: [], error: '머리줄에 year · title 열이 있어야 합니다. (공통 열: year, title, keywords, source · 발행연도 · 제목 · 주제어 같은 이름도 읽습니다)' };
     }
@@ -66,7 +78,9 @@
       const title = get(iTitle), keywords = get(iKeywords);
       // 빈 줄 · 연도가 없거나 앞 4자리가 숫자가 아닌 줄 · 제목과 키워드가 모두 빈 줄은 건너뛰고 줄 번호를 알림
       if (r.blank || !m || (!title && !keywords)) { skipped.push(r.line); return; }
-      records.push({ line: r.line, year: Number(m[1]), title, keywords, source: get(iSource) || defaultSource });
+      const rec = { line: r.line, year: Number(m[1]), title, keywords, source: get(iSource) || defaultSource };
+      EXTRA.forEach(k => { rec[k] = get(iExtra[k]); });
+      records.push(rec);
     });
     return { records, skipped, error: null };
   }
@@ -83,7 +97,7 @@
       if (!cur) return;
       const m = (cur.year || '').match(/(\d{4})/);
       if (!m || (!cur.title && !cur.kw.length)) skipped.push(start);
-      else records.push({ line: start, year: Number(m[1]), title: cur.title || '', keywords: cur.kw.join(';'), source: defaultSource });
+      else records.push({ line: start, year: Number(m[1]), title: cur.title || '', keywords: cur.kw.join(';'), source: defaultSource, type: '', publisher: '', country: '', field: '', note: '', url: '', open: '', id: '' });
       cur = null;
     };
     lines.forEach((raw, i) => {
