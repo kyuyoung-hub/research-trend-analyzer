@@ -5,9 +5,9 @@
 
 ## 설명 영상 (1분)
 
-[![설명 영상 미리보기](media/analyzer-demo-poster.png)](media/analyzer-demo.mp4)
+[![설명 영상 미리보기](media/analyzer-demo-poster.png)](https://kyuyoung-hub.github.io/research-trend-analyzer/media/analyzer-demo.mp4)
 
-그림을 누르면 영상이 열립니다([media/analyzer-demo.mp4](media/analyzer-demo.mp4)). 만든 이유 · 사용법 · 내 주제에 쓰는 법 · 내가 고친 부분 · 아쉬운 점을 담았습니다. 목소리는 Qwen3-TTS로 복제한 음성이며, 화면은 이 도구를 실제로 실행한 장면입니다.
+그림을 누르면 새 탭에서 영상이 재생됩니다([영상 바로 열기](https://kyuyoung-hub.github.io/research-trend-analyzer/media/analyzer-demo.mp4)). 만든 이유 · 사용법 · 내 주제에 쓰는 법 · 내가 고친 부분 · 아쉬운 점을 담았습니다. 목소리는 Qwen3-TTS로 복제한 음성이며, 화면은 이 도구를 실제로 실행한 장면입니다.
 
 ## 화면 설명
 
